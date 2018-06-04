@@ -5,7 +5,7 @@ import { GlobalStore } from './global-store.service';
 @NgModule({
   imports: [],
   exports: [],
-  declarations: [GlobalStore],
+  declarations: [],
   providers: [GlobalStore]
 })
 export class GlobalStoreModule {}

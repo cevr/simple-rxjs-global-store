@@ -38,4 +38,16 @@ fdescribe('GlobalStore', () => {
       expect(test).toEqual(['c', 'a', 'd', 'b']);
     });
   });
+
+  it('should subscribe to the sync state', () => {
+    service.dispatch({ key: 'test', payload: 'test' });
+    service.dispatch({ key: 'test1', payload: 'test1' });
+
+    service.subscribe(state => {
+      expect(state).toEqual({
+        test: 'test',
+        test1: 'test1'
+      });
+    });
+  });
 });

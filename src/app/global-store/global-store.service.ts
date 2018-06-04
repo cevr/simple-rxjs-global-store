@@ -7,6 +7,7 @@ import { State, SyncState, Action } from './global-store.definitions';
 @Injectable()
 export class GlobalStore {
   private state: State;
+  private state$: BehaviorSubject<SyncState> = new BehaviorSubject(undefined);
 
   constructor() {
     this.state = new Map();
@@ -29,6 +30,17 @@ export class GlobalStore {
    */
   public dispatch(action: Action): void {
     this.state = this.reduce(this.state, action);
+    this.state$.next(this.value());
+  }
+
+  /**
+   * Subscribes to the current whole state
+   * @param fnValue
+   * @param fnErr
+   * @param fnCompleted
+   */
+  public subscribe(fnValue, fnErr?, fnCompleted?): Subscription {
+    return this.state$.pipe(distinctUntilChanged()).subscribe(fnValue, fnErr, fnCompleted);
   }
 
   /**
@@ -64,7 +76,7 @@ export class GlobalStore {
 
   /**
    * Updates the current state if the key does not exist
-   * If the key exists, passes the new action.payload into the BehaviorSubject
+   * If the key exists, passes the new action.payload into the BehaviorSubject at action.key
    * @param state
    * @param action
    * @returns {State}
@@ -74,7 +86,6 @@ export class GlobalStore {
       state.get(action.key).next(action.payload);
       return state;
     }
-
     return state.set(action.key, new BehaviorSubject(action.payload));
   }
 }

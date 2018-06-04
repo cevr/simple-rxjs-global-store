@@ -19,65 +19,62 @@ describe('Store', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [StringBindingMapService, { provide: SocketService, useClass: FakeSocketService }, AppContextService]
+      providers: [StringBindingMapService, { provide: SocketService, useClass: FakeSocketService }]
     });
   });
 
-  it(
-    'should be created',
-    inject([StringBindingMapService], (bindingMap: StringBindingMapService) => {
-      const model = new MockStore(bindingMap);
-      expect(model).toBeTruthy();
-    })
-  );
+  it('should be created', inject([StringBindingMapService], (bindingMap: StringBindingMapService) => {
+    const store = new MockStore(bindingMap);
+    expect(store).toBeTruthy();
+  }));
 
-  it(
-    'should poll active commands when observed',
-    inject([StringBindingMapService], (bindingMap: StringBindingMapService) => {
-      const model = new MockStore(bindingMap);
-      model['registerActiveCommand']('');
+  it('should poll active commands when observed', inject(
+    [StringBindingMapService],
+    (bindingMap: StringBindingMapService) => {
+      const store = new MockStore(bindingMap);
+      store['registerActiveCommand']('');
 
-      expect(model.getActivityMode()).toEqual(ActivityMode.Active);
-    })
-  );
+      expect(store.getActivityMode()).toEqual(ActivityMode.Active);
+    }
+  ));
 
-  it(
-    'should be idle when not observed',
-    inject([StringBindingMapService], (bindingMap: StringBindingMapService) => {
-      const model = new MockStore(bindingMap);
-      model['registerActiveCommand']('');
-      expect(model.getActivityMode()).toEqual(ActivityMode.Idle);
-    })
-  );
+  it('should be idle when not observed', inject(
+    [StringBindingMapService],
+    (bindingMap: StringBindingMapService) => {
+      const store = new MockStore(bindingMap);
+      store['registerActiveCommand']('');
+      expect(store.getActivityMode()).toEqual(ActivityMode.Idle);
+    }
+  ));
 
-  it(
-    'should poll active commands',
-    inject([StringBindingMapService], (bindingMap: StringBindingMapService) => {
-      const model = new MockStore(bindingMap);
-      model['registerActiveCommand']('');
-      expect(model['activeCommands'].length).toEqual(1);
-    })
-  );
+  it('should poll active commands', inject(
+    [StringBindingMapService],
+    (bindingMap: StringBindingMapService) => {
+      const store = new MockStore(bindingMap);
+      store['registerActiveCommand']('');
+      expect(store['activeCommands'].length).toEqual(1);
+    }
+  ));
 
-  it(
-    'should update active commands',
-    inject([StringBindingMapService], (bindingMap: StringBindingMapService) => {
-      const model = new MockStore(bindingMap);
-      model['registerActiveCommand']('mockCommand', null, ['roomId', 'equipId']);
-      model['updateActiveCommand']('mockCommand', null, ['roomId2', 'equipId2']);
-      expect(model['activeCommands'][0].parameters).toEqual(['roomId2', 'equipId2']);
-    })
-  );
+  it('should update active commands', inject(
+    [StringBindingMapService],
+    (bindingMap: StringBindingMapService) => {
+      const store = new MockStore(bindingMap);
+      store['registerActiveCommand']('mockCommand', null, ['roomId', 'equipId']);
+      store['updateActiveCommand']('mockCommand', null, ['roomId2', 'equipId2']);
+      expect(store['activeCommands'][0].parameters).toEqual(['roomId2', 'equipId2']);
+    }
+  ));
 
-  it(
-    'should concat parameters when polling',
-    inject([StringBindingMapService], (bindingMap: StringBindingMapService) => {
-      const model = new MockStore(bindingMap);
-      const concatenatedCommand = model['buildStringCommand']({
+  it('should concat parameters when polling', inject(
+    [StringBindingMapService],
+    (bindingMap: StringBindingMapService) => {
+      const store = new MockStore(bindingMap);
+      const concatenatedCommand = store['buildStringCommand']({
         command: 'mockCommand',
         parameters: ['roomId', 'equipId']
       });
       expect(concatenatedCommand).toEqual('mockCommand:roomId:equipId');
-    })
-  );
+    }
+  ));
 });

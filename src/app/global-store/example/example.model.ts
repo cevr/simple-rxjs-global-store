@@ -23,6 +23,11 @@ export class ExampleModel extends Model {
     globalStore.subscribeTo(['accessLevel', 'currentLang'], ([accessLevel, currentLang]) => {
       this.state = this.reduce(this.state, { accessLevel, currentLang });
     });
+
+    // total subscription
+    globalStore.subscribe(state => {
+      this.state = this.reduce(this.state, { ...state });
+    });
   }
 
   private reduce(state, action) {
@@ -33,7 +38,7 @@ export class ExampleModel extends Model {
   /**
    * @see inherit
    */
-  public updateData(data: any): void {
+  public dispatch(data: any): void {
     switch (data.TYPE) {
       case 'example:command': {
         this.state = this.reduce(this.state, data);
