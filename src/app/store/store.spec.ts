@@ -19,7 +19,11 @@ describe('Store', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [StringBindingMapService, { provide: SocketService, useClass: FakeSocketService }]
+      providers: [
+        StringBindingMapService,
+        { provide: SocketService, useClass: FakeSocketService },
+        AppContextService
+      ]
     });
   });
 
@@ -32,9 +36,9 @@ describe('Store', () => {
     [StringBindingMapService],
     (bindingMap: StringBindingMapService) => {
       const store = new MockStore(bindingMap);
-      store['registerActiveCommand']('');
-
+      store['registerActiveCommand']('test');
       expect(store.getActivityMode()).toEqual(ActivityMode.Active);
+      store.onDestroy();
     }
   ));
 
@@ -42,7 +46,8 @@ describe('Store', () => {
     [StringBindingMapService],
     (bindingMap: StringBindingMapService) => {
       const store = new MockStore(bindingMap);
-      store['registerActiveCommand']('');
+      store['registerActiveCommand']('test');
+      store.onDestroy();
       expect(store.getActivityMode()).toEqual(ActivityMode.Idle);
     }
   ));
@@ -51,7 +56,8 @@ describe('Store', () => {
     [StringBindingMapService],
     (bindingMap: StringBindingMapService) => {
       const store = new MockStore(bindingMap);
-      store['registerActiveCommand']('');
+      store['registerActiveCommand']('test');
+      store.onDestroy();
       expect(store['activeCommands'].length).toEqual(1);
     }
   ));
@@ -62,6 +68,7 @@ describe('Store', () => {
       const store = new MockStore(bindingMap);
       store['registerActiveCommand']('mockCommand', null, ['roomId', 'equipId']);
       store['updateActiveCommand']('mockCommand', null, ['roomId2', 'equipId2']);
+      store.onDestroy();
       expect(store['activeCommands'][0].parameters).toEqual(['roomId2', 'equipId2']);
     }
   ));

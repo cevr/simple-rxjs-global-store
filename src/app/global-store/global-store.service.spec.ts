@@ -1,6 +1,6 @@
 import { GlobalStore } from './global-store.service';
 
-fdescribe('GlobalStore', () => {
+describe('GlobalStore', () => {
   let service;
 
   beforeEach(() => {

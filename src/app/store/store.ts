@@ -13,11 +13,13 @@ interface IStringCommand {
   command: string;
   parameters: Array<string>;
   refreshTime: number;
+  activated: boolean;
 }
 
 export abstract class Store {
   abstract state: any;
-  abstract state$: BehaviorSubject<any>;
+
+  public state$: BehaviorSubject<any> = new BehaviorSubject(this.state);
 
   protected activeCommands: Array<IStringCommand> = [];
   protected defaultRefreshTime = 1000;
@@ -32,17 +34,19 @@ export abstract class Store {
   }
 
   /**
-   * An active command will poll the API every X seconds
-   * The intervalID to clear will be equal to the command
+   * An active command will poll the API every X milliseconds.
+   * If no milliseconds provided, then it will default to 1000.
+   * The intervalID will be equal to the command
    * @param command The expected API response
    * @param refreshTime The interval timer
-   * @param params (Optional) List of parameters to add to the command when polling. The order is important.
+   * @param parameters (Optional) List of parameters to add to the command when polling. The order is important.
    */
-  protected registerActiveCommand(command: string, refreshTime?: number, params?: Array<string>) {
+  protected registerActiveCommand(command: string, refreshTime?: number, parameters?: Array<string>) {
     this.activeCommands = this.activeCommands.concat({
-      command: command,
-      parameters: params,
-      refreshTime: refreshTime || this.defaultRefreshTime
+      command,
+      parameters,
+      refreshTime: refreshTime || this.defaultRefreshTime,
+      activated: false
     });
     this.bindingMap.addBinding(command, this);
     this.setActivityMode();
@@ -57,21 +61,24 @@ export abstract class Store {
   }
 
   /**
-   * Update an existing command to change its parameters or refreshTime
+   * Update an existing command to change its parameters and/or refreshTime
    * @param command The expected API response
    * @param refreshTime The interval timer
    * @param newParams New set of parameters to add to the command when polling. The order is important.
    */
-  protected updateActiveCommand(command: string, refreshTime?: number, newParams?: Array<string>) {
+  protected updateActiveCommand(command: string, refreshTime?: number, newParams?: Array<string>): void {
+    this.clearActiveCommand(command);
     this.activeCommands = this.activeCommands.map((activeCommand: IStringCommand) => {
       return activeCommand.command === command
         ? {
             ...activeCommand,
             parameters: newParams,
-            refreshTime: refreshTime || this.defaultRefreshTime
+            refreshTime: refreshTime || this.defaultRefreshTime,
+            activated: false
           }
         : activeCommand;
     });
+    this.setActivityMode();
   }
 
   public getActivityMode(): ActivityMode {
@@ -87,20 +94,28 @@ export abstract class Store {
 
   private setActivityMode() {
     if (this.activeCommands && this.activeCommands.length > 0) {
-      if (this.activeObserverCount !== 0) {
+      if (this.activeObserverCount > 0) {
         this.activityMode = ActivityMode.Active;
         this.intervals = {
-          ...this.activeCommands.map(command => {
-            return {
-              [command.command]: setInterval(() => {
-                this.bindingMap.sendCommand(this.buildStringCommand(command));
-              }, command.refreshTime)
-            };
-          })
+          ...this.intervals,
+          ...Object.assign(
+            {},
+            ...this.activeCommands.map(command => {
+              if (!command.activated) {
+                command.activated = true;
+                return {
+                  [command.command]: setInterval(() => {
+                    console.log(command);
+                    this.bindingMap.sendCommand(this.buildStringCommand(command));
+                  }, command.refreshTime)
+                };
+              }
+            })
+          )
         };
       } else {
         this.activityMode = ActivityMode.Idle;
-        this.clearAllIntervals();
+        this.clearAllActiveCommands();
       }
     }
   }
@@ -124,27 +139,30 @@ export abstract class Store {
   }
 
   /**
-   * Clear an interval using its ID
-   * @param id interval ID
+   * Clears an interval using its command
+   * @param id command string
    */
-  clearInterval(id: string) {
+  clearActiveCommand(id: string) {
+    console.log(id);
     if (this.intervals[id]) {
       clearInterval(this.intervals[id]);
+    } else {
+      console.error(`${id} is not an active command!`);
     }
   }
 
   /**
-   * Clear many intervals using an array of IDs
-   * @param ids array of interval IDs
+   * Clears many intervals using an array of commands
+   * @param ids array of commands
    */
-  clearIntervals(ids: Array<any>) {
-    ids.forEach(id => this.clearInterval(this.intervals[id]));
+  clearActiveCommands(ids: Array<any>) {
+    ids.forEach(id => this.clearActiveCommand(this.intervals[id]));
   }
 
   /**
-   * Clear all active intervals
+   * Clears all active intervals
    */
-  clearAllIntervals() {
-    Object.values(this.intervals).forEach((id: string) => this.clearInterval(id));
+  clearAllActiveCommands() {
+    Object.keys(this.intervals).forEach((id: string) => this.clearActiveCommand(id));
   }
 }
