@@ -41,13 +41,7 @@ export class GlobalStore {
    * @param fnCompleted
    */
   public subscribe(fnValue, fnErr?, fnCompleted?): Subscription {
-    return this.state$
-      .pipe(
-        distinctUntilChanged((current, next) => {
-          return isEqual(current, next);
-        })
-      )
-      .subscribe(fnValue, fnErr, fnCompleted);
+    return this.state$.pipe(distinctUntilChanged(isEqual)).subscribe(fnValue, fnErr, fnCompleted);
   }
 
   /**
@@ -65,14 +59,14 @@ export class GlobalStore {
   public subscribeTo(key: string | string[], fnValue, fnErr?, fnCompleted?): Subscription {
     if (typeof key !== 'string') {
       const subscription = combineLatest(
-        ...key.map(k => this.state.get(k).pipe(distinctUntilChanged()))
+        ...key.map(k => this.state.get(k).pipe(distinctUntilChanged(isEqual)))
       ).pipe(catchError(err => of(err)));
       return subscription.subscribe(fnValue, fnErr, fnCompleted);
     }
 
     return this.state
       .get(key)
-      .pipe(distinctUntilChanged())
+      .pipe(distinctUntilChanged(isEqual))
       .subscribe(fnValue, fnErr, fnCompleted);
   }
 
