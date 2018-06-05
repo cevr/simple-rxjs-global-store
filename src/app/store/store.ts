@@ -64,13 +64,13 @@ export abstract class Store {
    * @param refreshTime The interval timer
    * @param newParams New set of parameters to add to the command when polling. The order is important.
    */
-  protected updateActiveCommand(command: string, refreshTime?: number, newParams?: Array<string>): void {
+  protected updateActiveCommand(command: string, refreshTime?: number, parameters?: Array<string>): void {
     this.clearActiveCommand(command);
     this.activeCommands = this.activeCommands.map((activeCommand: IStringCommand) => {
       return activeCommand.command === command
         ? {
             ...activeCommand,
-            parameters: newParams,
+            parameters,
             refreshTime: refreshTime || this.defaultRefreshTime
           }
         : activeCommand;
@@ -99,7 +99,6 @@ export abstract class Store {
             ...this.activeCommands.map(command => {
               return {
                 [command.command]: setInterval(() => {
-                  console.log(command);
                   this.bindingMap.sendCommand(this.buildStringCommand(command));
                 }, command.refreshTime)
               };
@@ -136,7 +135,6 @@ export abstract class Store {
    * @param id command string
    */
   clearActiveCommand(id: string) {
-    console.log(id);
     if (this.intervals[id]) {
       clearInterval(this.intervals[id]);
     } else {

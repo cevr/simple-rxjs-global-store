@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Subscription, forkJoin, of } from 'rxjs';
-import { catchError, take, distinctUntilChanged } from 'rxjs/operators';
+import { BehaviorSubject, Subscription, of, combineLatest } from 'rxjs';
+import { catchError, distinctUntilChanged } from 'rxjs/operators';
+import { isEqual } from 'lodash';
 
 import { State, SyncState, Action } from './global-store.definitions';
 
@@ -34,13 +35,19 @@ export class GlobalStore {
   }
 
   /**
-   * Subscribes to the current whole state
+   * Subscribes to the current sync state
    * @param fnValue
    * @param fnErr
    * @param fnCompleted
    */
   public subscribe(fnValue, fnErr?, fnCompleted?): Subscription {
-    return this.state$.pipe(distinctUntilChanged()).subscribe(fnValue, fnErr, fnCompleted);
+    return this.state$
+      .pipe(
+        distinctUntilChanged((current, next) => {
+          return isEqual(current, next);
+        })
+      )
+      .subscribe(fnValue, fnErr, fnCompleted);
   }
 
   /**
@@ -57,13 +64,8 @@ export class GlobalStore {
    */
   public subscribeTo(key: string | string[], fnValue, fnErr?, fnCompleted?): Subscription {
     if (typeof key !== 'string') {
-      const subscription = forkJoin(
-        ...key.map(k =>
-          this.state.get(k).pipe(
-            take(1),
-            distinctUntilChanged()
-          )
-        )
+      const subscription = combineLatest(
+        ...key.map(k => this.state.get(k).pipe(distinctUntilChanged()))
       ).pipe(catchError(err => of(err)));
       return subscription.subscribe(fnValue, fnErr, fnCompleted);
     }
