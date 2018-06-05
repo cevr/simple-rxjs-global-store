@@ -13,7 +13,6 @@ interface IStringCommand {
   command: string;
   parameters: Array<string>;
   refreshTime: number;
-  activated: boolean;
 }
 
 export abstract class Store {
@@ -45,8 +44,7 @@ export abstract class Store {
     this.activeCommands = this.activeCommands.concat({
       command,
       parameters,
-      refreshTime: refreshTime || this.defaultRefreshTime,
-      activated: false
+      refreshTime: refreshTime || this.defaultRefreshTime
     });
     this.bindingMap.addBinding(command, this);
     this.setActivityMode();
@@ -73,8 +71,7 @@ export abstract class Store {
         ? {
             ...activeCommand,
             parameters: newParams,
-            refreshTime: refreshTime || this.defaultRefreshTime,
-            activated: false
+            refreshTime: refreshTime || this.defaultRefreshTime
           }
         : activeCommand;
     });
@@ -97,19 +94,15 @@ export abstract class Store {
       if (this.activeObserverCount > 0) {
         this.activityMode = ActivityMode.Active;
         this.intervals = {
-          ...this.intervals,
           ...Object.assign(
             {},
             ...this.activeCommands.map(command => {
-              if (!command.activated) {
-                command.activated = true;
-                return {
-                  [command.command]: setInterval(() => {
-                    console.log(command);
-                    this.bindingMap.sendCommand(this.buildStringCommand(command));
-                  }, command.refreshTime)
-                };
-              }
+              return {
+                [command.command]: setInterval(() => {
+                  console.log(command);
+                  this.bindingMap.sendCommand(this.buildStringCommand(command));
+                }, command.refreshTime)
+              };
             })
           )
         };
