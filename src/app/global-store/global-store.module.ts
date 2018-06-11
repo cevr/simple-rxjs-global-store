@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 
-import { GlobalStore } from './global-store.service';
+import { GlobalStore } from './global.store';
 
 @NgModule({
   imports: [],

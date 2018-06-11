@@ -13,11 +13,6 @@ export class SocketService {
   public remoteMode: boolean;
   public loggedIn: boolean;
   public socket$: WebSocketSubject<any>;
-  public bindingMap: any; // StringBindingMapService or JSONBindingMapService
-  // TODO? Create abstract binding map
-
-  private commandQueue: string[] = [];
-  private inError = false;
 
   constructor(device: DeviceContextService) {
     this.remoteMode = false;
@@ -52,56 +47,12 @@ export class SocketService {
       serializer: value => value,
       deserializer: e => JSON.parse(e.data)
     });
-    this.initDispatcher();
-    this.initConnection();
+    this.socket$.next('auth:slaveLogin:1');
   }
 
   private restartSocket() {
     this.socket$ = undefined;
     this.openSocket();
-  }
-
-  /**
-   * This socket will only send changed data
-   * If polling and data has not changed, it will not send multiple times
-   */
-  private initDispatcher() {
-    this.socket$.subscribe(
-      payload => {
-        if (this.inError) {
-          this.inError = false;
-          this.commandQueue = [];
-        }
-        this.receiveData(payload);
-      },
-      err => this.socketErrorHandler(err),
-      () => {
-        console.warn('Socket connected closed.');
-      }
-    );
-  }
-
-  /**
-   * If socket is open, will send command to backend
-   * If socket is not open, will store command in queue
-   * Queue is flushed on socket init
-   */
-  public sendCommand(command: string) {
-    if (this.socket$ && !this.inError) {
-      if (this.remoteMode) {
-        this.socket$.next(this.token + '^' + this.serialNumber + '^' + command);
-      } else {
-        this.socket$.next(command);
-      }
-    } else {
-      if (!this.commandQueue.includes(command)) {
-        this.commandQueue = this.commandQueue.concat(command);
-      }
-    }
-  }
-
-  public setBindingMap(bindingMap: any) {
-    this.bindingMap = bindingMap;
   }
 
   private initRemoteConnection(data: any) {
@@ -112,27 +63,9 @@ export class SocketService {
     this.openSocket();
   }
 
-  private socketErrorHandler(error) {
-    this.inError = true;
+  public socketErrorHandler() {
     console.error('Retrying...');
     // TODO: Maybe restart the controller if it doesn't work in 1 minute ?
     setTimeout(() => this.openSocket(), 3000);
-  }
-
-  clearCommandQueue() {
-    if (this.commandQueue.length > 0) {
-      this.commandQueue.forEach(command => {
-        this.sendCommand(command);
-      });
-    }
-  }
-
-  private initConnection() {
-    this.clearCommandQueue();
-    this.sendCommand('auth:slaveLogin:1');
-  }
-
-  private receiveData(data: any) {
-    this.bindingMap.dispatch(data);
   }
 }

@@ -1,12 +1,24 @@
 import { ReplaySubject, Observable } from 'rxjs';
-import { distinctUntilChanged } from 'rxjs/operators';
+import { distinctUntilChanged, filter } from 'rxjs/operators';
 import { isEqual, cloneDeep } from 'lodash';
+import { WebSocketSubject } from 'rxjs/webSocket';
 
-import { StringBindingMapService } from '../binding-map/string-binding-map.service';
 import { StringCommand, Intervals } from './definitions';
+import { SocketService } from '../socket/socket.service';
 
 export abstract class Store {
   abstract state: any;
+
+  protected _state$ = new ReplaySubject(1);
+  protected activeCommands: Array<StringCommand> = [];
+  protected minRefreshTime = 2000;
+  protected intervals: Intervals = {};
+  protected socket$: WebSocketSubject<any>;
+
+  private activeObserverCount = 0;
+  private commandQueue: string[] = [];
+  private inError = false;
+  private listeners: string[] = [];
 
   get state$() {
     return Observable.create(observer => {
@@ -21,14 +33,10 @@ export abstract class Store {
     });
   }
 
-  protected _state$ = new ReplaySubject(1);
-  protected activeCommands: Array<StringCommand> = [];
-  protected minRefreshTime = 2000;
-  protected intervals: Intervals = {};
-
-  private activeObserverCount = 0;
-
-  constructor(protected bindingMap: StringBindingMapService) {}
+  constructor(protected socket: SocketService) {
+    this.socket$ = socket.socket$;
+    this.initDispatcher();
+  }
 
   /**
    * An active command will poll the API every X milliseconds, cannot be lower than 2000.
@@ -49,7 +57,7 @@ export abstract class Store {
       refreshTime: refreshTime || this.minRefreshTime,
       isPolling: false
     });
-    this.bindingMap.addBinding(command, this);
+    this.addListener(command);
     this.setActivityMode();
   }
 
@@ -60,10 +68,10 @@ export abstract class Store {
   protected registerListener(command: string | string[]) {
     if (typeof command !== 'string') {
       command.forEach((comm: string) => {
-        this.bindingMap.addBinding(comm, this);
+        this.addListener(comm);
       });
     } else {
-      this.bindingMap.addBinding(command, this);
+      this.addListener(command);
     }
   }
 
@@ -125,7 +133,7 @@ export abstract class Store {
             command.isPolling = true;
             return {
               [command.command]: setInterval(() => {
-                this.bindingMap.sendCommand(this.buildStringCommand(command));
+                this.sendCommand(this.buildStringCommand(command));
               }, command.refreshTime)
             };
           }
@@ -194,5 +202,65 @@ export abstract class Store {
    */
   protected clearAllCommandIntervals(): void {
     Object.keys(this.intervals).forEach((id: string) => this.clearCommandInterval(id));
+  }
+
+  /**
+   * This socket will only send changed data
+   * If polling and data has not changed, it will not send multiple times
+   */
+  protected initDispatcher(dataFilter = this.defaultFilter, changeDetector = isEqual) {
+    this.socket$
+      .pipe(
+        filter(dataFilter),
+        distinctUntilChanged(changeDetector)
+      )
+      .subscribe(
+        payload => {
+          if (this.inError) {
+            this.inError = false;
+            this.commandQueue = [];
+          }
+          this.dispatch(payload);
+        },
+        () => {
+          this.inError = true;
+          this.socket.socketErrorHandler();
+        }
+      );
+  }
+
+  protected defaultFilter({ TYPE }): boolean {
+    return this.listeners.includes(TYPE);
+  }
+
+  /**
+   * If socket is open, will send command to backend
+   * If socket is not open, will store command in queue
+   * Queue is flushed on socket init
+   */
+  protected sendCommand(command: string) {
+    if (this.socket$ && !this.inError) {
+      if (this.socket.remoteMode) {
+        this.socket$.next(this.socket.token + '^' + this.socket.serialNumber + '^' + command);
+      } else {
+        this.socket$.next(command);
+      }
+    } else {
+      if (!this.commandQueue.includes(command)) {
+        this.commandQueue = this.commandQueue.concat(command);
+      }
+    }
+  }
+
+  protected clearCommandQueue() {
+    if (this.commandQueue.length > 0) {
+      this.commandQueue.forEach(command => {
+        this.sendCommand(command);
+      });
+    }
+  }
+
+  protected addListener(command: string): void {
+    this.listeners = this.listeners.concat(command);
   }
 }
