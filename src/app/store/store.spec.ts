@@ -5,6 +5,7 @@ import { StringBindingMapService } from '../binding-map/string-binding-map.servi
 import { SocketService } from '../socket/socket.service';
 import { AppContextService } from '../context/app-context.service';
 import { FakeSocketService } from '../socket/fake-socket.service';
+import { StringCommand } from './definitions';
 
 describe('Store', () => {
   class MockStore extends Store {
@@ -67,8 +68,9 @@ describe('Store', () => {
       const store = new MockStore(bindingMap);
       const concatenatedCommand = store['buildStringCommand']({
         command: 'mockCommand',
-        parameters: ['roomId', 'equipId']
-      });
+        parameters: ['roomId', 'equipId'],
+        refreshTime: 2000
+      } as StringCommand);
       expect(concatenatedCommand).toEqual('mockCommand:roomId:equipId');
     }
   ));

@@ -3,25 +3,8 @@ import { distinctUntilChanged } from 'rxjs/operators';
 import { isEqual, cloneDeep } from 'lodash';
 
 import { StringBindingMapService } from '../binding-map/string-binding-map.service';
+import { StringCommand, Intervals } from './definitions';
 
-export enum ActivityMode {
-  ActiveHighPriority = 200, // Action in progress, user needs feedback right now
-  Active = 1000, // User is actively looking at the page
-  ActiveLowPriority = 10000, // User is looking at an unimportant page, update the model silently (refresh once every 10 seconds)
-  Idle // User is not looking, stop polling
-  // LazyLoading // We want to pre-load data because the user will probably need it in the future
-}
-
-interface IStringCommand {
-  command: string;
-  parameters: Array<string>;
-  refreshTime: number;
-  isPolling: boolean;
-}
-
-interface Intervals {
-  [key: string]: number;
-}
 export abstract class Store {
   abstract state: any;
 
@@ -39,7 +22,7 @@ export abstract class Store {
   }
 
   protected _state$ = new ReplaySubject(1);
-  protected activeCommands: Array<IStringCommand> = [];
+  protected activeCommands: Array<StringCommand> = [];
   protected minRefreshTime = 2000;
   protected intervals: Intervals = {};
 
@@ -48,8 +31,8 @@ export abstract class Store {
   constructor(protected bindingMap: StringBindingMapService) {}
 
   /**
-   * An active command will poll the API every X milliseconds.
-   * If no milliseconds provided, then it will default to 1000.
+   * An active command will poll the API every X milliseconds, cannot be lower than 2000.
+   * If no milliseconds provided, then it will default to 2000.
    * The intervalID will be equal to the command
    * @param command The expected API response
    * @param refreshTime The interval timer
@@ -72,11 +55,11 @@ export abstract class Store {
 
   /**
    * listens to data from the API but does not poll
-   * @param command The expected response TYPE. If array, will register each command in array.
+   * @param command The expected response type. If array, will register each type in array.
    */
   protected registerListener(command: string | string[]) {
     if (typeof command !== 'string') {
-      command.forEach(comm => {
+      command.forEach((comm: string) => {
         this.bindingMap.addBinding(comm, this);
       });
     } else {
@@ -92,14 +75,14 @@ export abstract class Store {
    */
   protected updateActiveCommand(command: string, refreshTime?: number, parameters?: Array<string>): void {
     this.clearCommandInterval(command);
-    this.activeCommands = this.activeCommands.map((activeCommand: IStringCommand) => {
+    this.activeCommands = this.activeCommands.map((activeCommand: StringCommand) => {
       return activeCommand.command === command
         ? ({
             ...activeCommand,
             parameters,
             refreshTime: refreshTime || this.minRefreshTime,
             isPolling: false
-          } as IStringCommand)
+          } as StringCommand)
         : activeCommand;
     });
     this.setActivityMode();
@@ -119,22 +102,7 @@ export abstract class Store {
   protected setActivityMode(): void {
     if (this.activeCommands && this.activeCommands.length > 0) {
       if (this.activeObserverCount > 0) {
-        this.intervals = {
-          ...this.intervals,
-          ...Object.assign(
-            {},
-            ...this.activeCommands.map(command => {
-              if (!command.isPolling) {
-                command.isPolling = true;
-                return {
-                  [command.command]: setInterval(() => {
-                    this.bindingMap.sendCommand(this.buildStringCommand(command));
-                  }, command.refreshTime)
-                };
-              }
-            })
-          )
-        };
+        this.intervals = this.setCommandIntervals(this.intervals, this.activeCommands);
       } else {
         this.clearAllCommandIntervals();
       }
@@ -142,10 +110,35 @@ export abstract class Store {
   }
 
   /**
-   * Concat all parameters to the base string
-   * @param stringCommand An object implementing the IStringCommand interface
+   * Takes the current intervals and adds an interval for every active command that is not polling
+   * @returns the updated active command interval map
+   * @param intervals
+   * @param activeCommands
    */
-  protected buildStringCommand(stringCommand: any): string {
+  protected setCommandIntervals(intervals: Intervals, activeCommands: StringCommand[]): Intervals {
+    return {
+      ...intervals,
+      ...Object.assign(
+        {},
+        ...activeCommands.map(command => {
+          if (!command.isPolling) {
+            command.isPolling = true;
+            return {
+              [command.command]: setInterval(() => {
+                this.bindingMap.sendCommand(this.buildStringCommand(command));
+              }, command.refreshTime)
+            };
+          }
+        })
+      )
+    };
+  }
+
+  /**
+   * Concat all parameters to the base string
+   * @param stringCommand An object implementing the StringCommand interface
+   */
+  protected buildStringCommand(stringCommand: StringCommand): string {
     let commandToRefresh = stringCommand.command;
     if (stringCommand.parameters) {
       stringCommand.parameters.forEach(param => (commandToRefresh = commandToRefresh.concat(':' + param)));
@@ -157,7 +150,7 @@ export abstract class Store {
    * Returns a new state with the added modifications
    * If a function is used as the parameter, it will pass the current state.
    * The function must return the new modifications;
-   * ex: setState(function(prevState) => { return {...prevState, modification: modification}})
+   * @example: setState(function(prevState) => { return {...prevState, modification: modification}})
    * @returns new state
    */
   protected setState(payload): any {

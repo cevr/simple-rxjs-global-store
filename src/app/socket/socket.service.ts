@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-import { distinctUntilChanged } from 'rxjs/operators';
-import { isEqual } from 'lodash';
+
 import { DeviceContextService } from '../device-context/device-context.service';
 
 const COMMUNICATION_PORT = 9002;
@@ -42,9 +41,9 @@ export class SocketService {
 
   /**
    * Opens the websocket with a WebSocketSubjectConfiguration object
-   * @param url: websocket url
-   * @param serializer: function that transforms outgoing data
-   * @param deserializer: function that transforms incoming data
+   * @prop url: websocket url
+   * @prop serializer: function that transforms outgoing data
+   * @prop deserializer: function that transforms incoming data
    */
   private openSocket() {
     const target = this.remoteMode ? 'wss:' + this.url : 'ws:' + this.url + ':' + COMMUNICATION_PORT;
@@ -67,10 +66,11 @@ export class SocketService {
    * If polling and data has not changed, it will not send multiple times
    */
   private initDispatcher() {
-    this.socket$.pipe(distinctUntilChanged(isEqual)).subscribe(
+    this.socket$.subscribe(
       payload => {
-        if (!this.inError) {
+        if (this.inError) {
           this.inError = false;
+          this.commandQueue = [];
         }
         this.receiveData(payload);
       },
@@ -88,7 +88,6 @@ export class SocketService {
    */
   public sendCommand(command: string) {
     if (this.socket$ && !this.inError) {
-      this.commandQueue = [];
       if (this.remoteMode) {
         this.socket$.next(this.token + '^' + this.serialNumber + '^' + command);
       } else {
